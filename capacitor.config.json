@@ -1,0 +1,6 @@
+{
+  "appId": "com.musicvideomaker.app",
+  "appName": "Music Video Maker",
+  "webDir": "web",
+  "server": { "androidScheme": "https" }
+}
