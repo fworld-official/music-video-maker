@@ -14,37 +14,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools,platforms;android-35,build-tools;35.0.0'
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
       - name: Add Capacitor runtime for plain JS
         run: cp node_modules/@capacitor/core/dist/capacitor.js web/capacitor.js
+
       - name: Create Android project
         run: |
           npx cap add android
           npx cap sync android
+
       - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk MusicVideoMaker.apk
+
       - uses: actions/upload-artifact@v4
         with:
           name: MusicVideoMaker-apk
           path: MusicVideoMaker.apk
+
       - name: Publish APK to Releases
         uses: softprops/action-gh-release@v2
         with:
