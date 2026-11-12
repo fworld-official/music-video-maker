@@ -23,12 +23,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+
+      - name: Ensure GitHub Pages is enabled in repo settings
+        run: echo "GitHub Pages must be enabled once in Settings → Pages → Source: GitHub Actions"
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
+
       - id: deployment
         uses: actions/deploy-pages@v4
