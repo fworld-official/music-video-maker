@@ -3,7 +3,12 @@ name: Build Android APK
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'package.json', 'capacitor.config.json', '.github/workflows/android.yml']
+    paths:
+      - 'web/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
 
 permissions:
@@ -13,31 +18,42 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools,platforms;android-35,build-tools;35.0.0'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
       - name: Add Capacitor runtime for plain JS
-        run: cp node_modules/@capacitor/core/dist/capacitor.js web/capacitor.js
+        run: |
+          mkdir -p web
+          if [ -f node_modules/@capacitor/core/dist/capacitor.js ]; then
+            cp node_modules/@capacitor/core/dist/capacitor.js web/capacitor.js
+          else
+            echo "ERROR: capacitor.js not found"
+            ls -la node_modules/@capacitor/core/dist/ || true
+            exit 1
+          fi
 
+      # android/ в .gitignore — каждый раз создаём платформу заново
       - name: Create Android project
         run: |
+          rm -rf android
           npx cap add android
           npx cap sync android
 
@@ -45,20 +61,30 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk MusicVideoMaker.apk
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk MusicVideoMaker.apk
+          ls -lh MusicVideoMaker.apk
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: MusicVideoMaker-apk
           path: MusicVideoMaker.apk
+          retention-days: 14
 
       - name: Publish APK to Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
           name: Android APK (latest)
-          body: Свежая сборка приложения. Скачай MusicVideoMaker.apk и установи на телефон.
+          body: |
+            Свежая сборка приложения.
+            Скачай **MusicVideoMaker.apk** и установи на телефон.
+
+            (debug-сборка)
           files: MusicVideoMaker.apk
+          draft: false
+          prerelease: false
