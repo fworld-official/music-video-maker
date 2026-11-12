@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0e13">
+<title>Music Video Maker</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0 auto;padding:16px;font:15px system-ui,sans-serif;background:#0d0e13;color:#e8eaf2;max-width:520px}
+h1{font-size:20px}
+label{display:block;margin:12px 0 4px;color:#aab}
+input,select,button{width:100%;box-sizing:border-box;padding:11px;border-radius:10px;border:1px solid #2a2d3a;background:#171925;color:inherit;font:inherit}
+button{background:#5f78ff;border:0;font-weight:700;margin-top:14px}
+button.g{background:#2a2d3a}button:disabled{opacity:.5}
+input[type=color]{height:44px;padding:3px}
+canvas,video.r{width:100%;border-radius:12px;background:#000;margin-top:14px}
+#bar{height:8px;background:#222;border-radius:4px;margin-top:10px}
+#pb{display:block;height:100%;width:0;background:#5f78ff;border-radius:4px}
+small{color:#889;display:block;margin-top:8px}
+</style></head><body>
+<h1>🎵 Music Video Maker</h1>
+<label>Фон-видео (персонаж)</label><input id="vf" type="file" accept="video/*">
+<label>Музыка</label><input id="af" type="file" accept="audio/*">
+<label>Название</label><input id="ti">
+<label>Автор</label><input id="au">
+<label>Цвет</label><input id="ac" type="color" value="#5f78ff">
+<label>Полосок: <span id="nbv">40</span></label><input id="nb" type="range" min="16" max="80" value="40">
+<label>Размер</label><select id="sz"><option value="720">720 по ширине (быстрее)</option><option value="1080">1080 по ширине</option></select>
+<label>Качество</label><select id="q"><option value="5000000">Среднее</option><option value="8000000">Высокое</option><option value="2500000">Лёгкое</option></select>
+<label>Обрезать до, сек (0 = весь трек)</label><input id="lim" type="number" value="0" min="0">
+<canvas id="cv" width="540" height="810"></canvas>
+<div id="bar"><i id="pb"></i></div><small id="st">Выбери видео и музыку</small>
+<button id="go">Создать видео</button><button id="cn" class="g">Отмена</button>
+<div id="res"></div>
+<small>Видео записывается в реальном времени: 3 минуты трека = 3 минуты записи. Не сворачивай приложение и не блокируй экран.</small>
+<script src="capacitor.js"></script>
+<script>
+const $=i=>document.getElementById(i),cv=$('cv'),cx=cv.getContext('2d'),V=document.createElement('video');
+V.muted=V.loop=V.playsInline=true;
+let actx,total=0,running=false,rec,src;
+const C=window.Capacitor,native=!!(C&&C.isNativePlatform&&C.isNativePlatform());
+const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+const st=t=>$('st').textContent=t,FONT='system-ui,"Segoe UI",Roboto,sans-serif';
+function rr(x,y,w,h,r){r=Math.min(r,w/2,h/2);cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath()}
+function draw(t,tot,lv){
+ const W=cv.width,H=cv.height,s=Math.min(W/1080,H/1620),OH=460*s,OY=H-OH-40*s,pad=W*.083,nb=lv.length,ac=$('ac').value;
+ if(V.readyState>1)cx.drawImage(V,0,0,W,H);else{cx.fillStyle='#000';cx.fillRect(0,0,W,H)}
+ const g=cx.createLinearGradient(0,OY,0,OY+OH);
+ for(let k=0;k<=8;k++){const p=k/8;g.addColorStop(p,'rgba(0,0,0,'+Math.pow(Math.min(1,Math.max(0,(p*OH-20*s)/(OH*.55))),1.2)*.84+')')}
+ cx.fillStyle=g;cx.fillRect(0,OY,W,H-OY);
+ const gap=Math.min(14,Math.max(4,400/nb))*s,bw=(W-2*pad-gap*(nb-1))/nb,y1=OY+210*s;
+ cx.save();cx.shadowColor=ac;cx.shadowBlur=16*s;cx.fillStyle=ac;cx.beginPath();
+ for(let i=0;i<nb;i++)rr(pad+i*(bw+gap),y1-lv[i]*170*s,bw,lv[i]*170*s,bw/2);
+ cx.fill();cx.restore();
+ cx.textBaseline='top';cx.fillStyle='#eef1ff';
+ let fs=50*s;const ti=$('ti').value;
+ do{cx.font='700 '+fs+'px '+FONT}while(cx.measureText(ti).width>W-2*pad&&(fs-=1)>14);
+ cx.fillText(ti,pad,OY+232*s);
+ cx.font='500 '+36*s+'px '+FONT;cx.fillStyle=ac;cx.fillText($('au').value,pad,OY+296*s);
+ const by=OY+380*s,th=10*s,xe=pad+(W-2*pad)*Math.min(1,t/(tot||1));
+ cx.fillStyle='rgba(255,255,255,.25)';cx.beginPath();rr(pad,by,W-2*pad,th,th/2);cx.fill();
+ cx.fillStyle=ac;cx.beginPath();rr(pad,by,Math.max(th,xe-pad),th,th/2);cx.fill();
+ cx.save();cx.shadowColor=ac;cx.shadowBlur=14*s;cx.beginPath();cx.arc(xe,by+th/2,15*s,0,7);cx.fill();cx.restore();
+ cx.fillStyle='#fff';cx.beginPath();cx.arc(xe,by+th/2,7*s,0,7);cx.fill();
+ cx.font='500 '+32*s+'px '+FONT;cx.fillText(fmt(t),pad,by+28*s);cx.textAlign='right';cx.fillText(fmt(tot),W-pad,by+28*s);cx.textAlign='left';
+}
+function levels(an,fb,prev){an.getByteFrequencyData(fb);const nb=prev.length,ny=actx.sampleRate/2,n=fb.length,o=new Float32Array(nb);
+ for(let i=0;i<nb;i++){const a=Math.floor(45*Math.pow(311,i/nb)/ny*n),b=Math.max(a+1,Math.ceil(45*Math.pow(311,(i+1)/nb)/ny*n));let m=0;for(let k=a;k<b&&k<n;k++)m=Math.max(m,fb[k]);
+  o[i]=Math.min(1,Math.max(.07,Math.pow(m/255,1.5)*(.9+.5*i/nb),prev[i]*.86))}return o}
+const idle=()=>{if(!running&&V.readyState>1)draw(0,total,new Float32Array(+$('nb').value).fill(.3))};
+function fit(){const k=Math.min(1,+$('sz').value/V.videoWidth);cv.width=Math.round(V.videoWidth*k/2)*2;cv.height=Math.round(V.videoHeight*k/2)*2}
+$('vf').onchange=e=>{const f=e.target.files[0];if(!f)return;V.src=URL.createObjectURL(f);V.onloadeddata=()=>{fit();V.currentTime=.1};V.onseeked=idle};
+$('af').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!$('ti').value)$('ti').value=f.name.replace(/\.[^.]+$/,'');const a=new Audio(URL.createObjectURL(f));a.onloadedmetadata=()=>{total=a.duration;idle()}};
+['ti','au','ac','nb'].forEach(i=>$(i).oninput=()=>{$('nbv').textContent=$('nb').value;idle()});
+$('sz').onchange=()=>{if(V.videoWidth){fit();idle()}};
+const P=n=>(C.Plugins&&C.Plugins[n])||C.registerPlugin(n);
+async function nat(b,name){const F=P('Filesystem'),S=P('Share'),CH=1572864;
+ for(let p=0;p<b.size;p+=CH){const d=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result.split(',')[1]);f.readAsDataURL(b.slice(p,p+CH))});
+  await F[p?'appendFile':'writeFile']({path:name,data:d,directory:'CACHE'})}
+ const {uri}=await F.getUri({path:name,directory:'CACHE'});await S.share({title:name,files:[uri]})}
+function done(b,ext){V.pause();$('go').disabled=false;st('Готово! '+(b.size/1048576).toFixed(1)+' МБ');
+ const name=($('ti').value||'video').replace(/[\\/:*?"<>|]/g,'_')+'.'+ext,u=URL.createObjectURL(b);
+ $('res').innerHTML='<video class="r" src="'+u+'" controls playsinline></video><button id="sv">'+(native?'Сохранить / поделиться':'Скачать .'+ext)+'</button>';
+ $('sv').onclick=()=>native?nat(b,name).catch(e=>st('Ошибка: '+e.message)):Object.assign(document.createElement('a'),{href:u,download:name}).click()}
+$('go').onclick=async()=>{
+ if(running)return;const vf=$('vf').files[0],af=$('af').files[0];if(!vf||!af)return st('Сначала выбери видео и музыку');
+ try{
+  actx=actx||new(window.AudioContext||window.webkitAudioContext)();await actx.resume();
+  st('Читаю трек…');const buf=await actx.decodeAudioData(await af.arrayBuffer());
+  const lim=parseFloat($('lim').value)||0,dur=lim>0?Math.min(lim,buf.duration):buf.duration;
+  if(V.readyState<2)await new Promise(r=>{V.onloadeddata=r});
+  fit();await V.play();
+  const an=actx.createAnalyser();an.fftSize=4096;an.smoothingTimeConstant=.5;an.minDecibels=-85;an.maxDecibels=-25;
+  const dst=actx.createMediaStreamDestination();src=actx.createBufferSource();src.buffer=buf;src.connect(an);an.connect(dst);
+  const mt=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
+  if(!mt)throw Error('браузер не умеет записывать видео');
+  const ch=[];rec=new MediaRecorder(new MediaStream([...cv.captureStream(30).getVideoTracks(),...dst.stream.getAudioTracks()]),{mimeType:mt,videoBitsPerSecond:+$('q').value,audioBitsPerSecond:192000});
+  rec.ondataavailable=e=>e.data.size&&ch.push(e.data);
+  rec.onstop=()=>done(new Blob(ch,{type:mt.split(';')[0]}),mt.includes('mp4')?'mp4':'webm');
+  $('res').innerHTML='';running=true;$('go').disabled=true;
+  rec.start(1000);const t0=actx.currentTime;src.start(0,0,dur);
+  const fb=new Uint8Array(an.frequencyBinCount);let lv=new Float32Array(+$('nb').value).fill(.07);
+  const tick=()=>{if(!running)return;const t=Math.min(actx.currentTime-t0,dur);lv=levels(an,fb,lv);draw(t,dur,lv);
+   $('pb').style.width=t/dur*100+'%';st('Запись… '+fmt(t)+' / '+fmt(dur));
+   if(t>=dur){running=false;setTimeout(()=>rec.stop(),300)}else requestAnimationFrame(tick)};tick();
+ }catch(e){running=false;$('go').disabled=false;st('Ошибка: '+e.message)}};
+$('cn').onclick=()=>{if(!running)return;running=false;rec.onstop=null;try{rec.stop();src.stop()}catch(e){}V.pause();$('go').disabled=false;st('Отменено')};
+</script></body></html>
